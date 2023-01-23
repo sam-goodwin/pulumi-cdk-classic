@@ -1,0 +1,14 @@
+{
+  "name": "test-app",
+  "main": "lib/index.ts",
+  "scripts": {
+    "up": "pulumi up"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/cdk": "^0.4.0",
+    "@pulumi/aws": "^5.0.0",
+    "@pulumi/awsx": "^1.0.0",
+    "pulumi-l2": "workspace:^"
+  }
+}
