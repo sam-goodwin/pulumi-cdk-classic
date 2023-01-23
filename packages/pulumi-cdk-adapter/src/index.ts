@@ -6,6 +6,7 @@ import { CfnElement, isResolvableObject } from "aws-cdk-lib";
 import { CfnRole, PolicyDocument } from "aws-cdk-lib/aws-iam";
 
 import { CfnFunction } from "aws-cdk-lib/aws-lambda";
+import { RemoteAsset } from "@pulumi/pulumi/asset";
 
 export function remapCloudControlResource(
   element: CfnElement,
@@ -15,21 +16,28 @@ export function remapCloudControlResource(
   options: ResourceOptions
 ): ResourceMapping | undefined {
   if (element instanceof CfnFunction) {
-    fs.writeFileSync("props.json", JSON.stringify(props, null, 2));
-
-    // return new lambda.Function(
-    //   element.node.path,
-    //   {
-    //     code: element.code,
-    //     runtime: element.runtime,
-    //     role: element.role,
-    //     architectures: element.architectures,
-    //     layers: element.layers,
-    //     codeSigningConfigArn: element.codeSigningConfigArn,
-    //   },
-    //   options
-    // );
+    console.log(props);
+    return new lambda.Function(
+      element.node.path,
+      {
+        architectures: props.Architectures,
+        // code: new RemoteAsset(),
+        name: props.FunctionName,
+        role: props.Role,
+        runtime: props.Runtime,
+        // environment: {
+        //   variables: element.environment,
+        // },
+      },
+      options
+    );
   }
 
   return undefined;
 }
+
+// function resolve(val: any) {
+//   if (isResolvableObject(val)) {
+//     val.resolve({});
+//   }
+// }
