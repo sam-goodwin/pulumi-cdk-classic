@@ -1,6 +1,7 @@
 {
   "name": "test-app",
-  "main": "lib/index.ts",
+  "main": "lib/index.js",
+  "version": "0.0.0",
   "scripts": {
     "up": "pulumi up"
   },
