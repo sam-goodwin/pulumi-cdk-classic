@@ -37,6 +37,8 @@ export function Bridge<C extends Constructor>(ctor: C): BridgedConstructor<C> {
 
       const instance = new ctor(this, name, fromPulumi(props));
 
+      this.synth();
+
       const bridged: any = {};
       return new Proxy(this, {
         get: (self, prop) => {
