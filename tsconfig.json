@@ -1,7 +1,8 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/pulumi-cdk-adapter/" },
+    { "path": "./tsconfig.cjs.json" },
+    { "path": "./tsconfig.esm.json" },
     { "path": "./test-app" }
   ]
 }

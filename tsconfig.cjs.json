@@ -1,7 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "./tsconfig.base.json",
   "include": ["src"],
-  "exclude": ["lib", "node_modules"],
+  "exclude": ["lib", "node_modules", "src/package.json"],
   "compilerOptions": {
     "outDir": "lib",
     "module": "CommonJS",

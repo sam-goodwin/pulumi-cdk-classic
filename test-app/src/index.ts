@@ -1,5 +1,5 @@
 import * as cdk from "@pulumi/cdk";
-import { remapCloudControlResource } from "pulumi-cdk-adapter";
+import { remapCloudControlResource } from "../../src";
 import { aws_lambda } from "aws-cdk-lib";
 import { iam } from "@pulumi/aws";
 import path from "path";
