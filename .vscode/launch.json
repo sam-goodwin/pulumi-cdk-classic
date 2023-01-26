@@ -13,6 +13,16 @@
       "runtimeArgs": ["--enable-source-maps"],
       "env": { "NODE_OPTIONS": "--experimental-vm-modules" },
       "args": ["--runInBand", "--watchAll=false"]
+    },
+    {
+      "type": "node",
+      "name": "gen-cfn-types",
+      "console": "integratedTerminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/scripts",
+      "runtimeArgs": ["--loader", "ts-node/esm"],
+      "args": ["${workspaceFolder}/scripts/gen-cfn-types.ts"],
+      "outFiles": ["${workspaceFolder}/**/*.js", "!**/node_modules/**"]
     }
   ]
 }

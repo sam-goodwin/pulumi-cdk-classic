@@ -7,3 +7,4 @@ node_modules
 cdk.out
 .eventual
 .DS_Store
+src/*.generated.ts

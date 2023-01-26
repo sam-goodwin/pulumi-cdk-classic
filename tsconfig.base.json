@@ -1,13 +1,16 @@
 {
   "extends": "@tsconfig/node16/tsconfig.json",
   "compilerOptions": {
+    "sourceMap": true,
     "declaration": true,
     "declarationMap": true,
     "esModuleInterop": true,
-    "moduleResolution": "Node",
-    "target": "ES2020",
-    "module": "CommonJS",
+    "allowSyntheticDefaultImports": true,
     "lib": ["ES2020"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "target": "ES2020",
     "types": ["@types/node", "@types/jest"]
   }
 }

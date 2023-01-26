@@ -1,6 +1,6 @@
 {
   "name": "pulumi-cdk-classic",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "files": [
     "lib"
   ],
@@ -8,6 +8,7 @@
   "main": "./lib/cjs/index.js",
   "types": "./lib/index.d.ts",
   "scripts": {
+    "gen:cfn": "ts-node-esm  ./scripts/gen-cfn-types.ts",
     "build": "tsc -b",
     "watch": "tsc -b -w",
     "up": "yarn workspace test-app up"
@@ -20,6 +21,7 @@
     "constructs": "^10"
   },
   "devDependencies": {
+    "@aws-cdk/cfnspec": "1.190.0",
     "@pulumi/aws": "5.27.0",
     "@pulumi/cdk": "0.4.0",
     "@pulumi/pulumi": "3.52.0",
