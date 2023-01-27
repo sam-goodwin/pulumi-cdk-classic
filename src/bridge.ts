@@ -95,7 +95,7 @@ export type FromPulumi<T> = T extends Construct
   ? FromPulumi<U>[]
   : T extends Output<any> | Promise<any>
   ? T
-  : T extends undefined | null | boolean | number | string
+  : T extends boolean | number | string
   ? Input<T>
   : T;
 

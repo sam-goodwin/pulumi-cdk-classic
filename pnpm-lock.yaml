@@ -39,6 +39,9 @@ importers:
   lib/esm:
     specifiers: {}
 
+  scripts:
+    specifiers: {}
+
   src:
     specifiers: {}
 
