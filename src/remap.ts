@@ -19,10 +19,10 @@ export function remapCloudControlResource(
   element: CfnElement,
   logicalId: string,
   typeName: string,
-  props: any,
+  props: any = {},
   options: ResourceOptions
 ): ResourceMapping | undefined {
-  const name = logicalId;
+  const name = logicalId.slice(0, 92);
   // todo
   if (is<AWS.Lambda.Function>("AWS::Lambda::Function", props)) {
     if (props.FileSystemConfigs && props.FileSystemConfigs.length > 1) {
@@ -43,9 +43,11 @@ export function remapCloudControlResource(
         s3Bucket: props.Code.S3Bucket,
         s3Key: props.Code.S3Key,
         s3ObjectVersion: props.Code.S3ObjectVersion,
-        environment: {
-          variables: props.Environment?.Variables,
-        },
+        environment: props.Environment?.Variables
+          ? {
+              variables: props.Environment.Variables,
+            }
+          : undefined,
         codeSigningConfigArn: props.CodeSigningConfigArn,
         deadLetterConfig: props.DeadLetterConfig?.TargetArn
           ? {
@@ -276,6 +278,122 @@ export function remapCloudControlResource(
         )
     );
     return comp;
+  } else if (is<AWS.Lambda.Permission>("AWS::Lambda::Permission", props)) {
+    return new lambda.Permission(
+      name,
+      {
+        action: props.Action,
+        function: props.FunctionName,
+        principal: props.Principal,
+        eventSourceToken: props.EventSourceToken,
+        functionUrlAuthType: props.FunctionUrlAuthType,
+        principalOrgId: props.PrincipalOrgID,
+        sourceAccount: props.SourceAccount,
+        sourceArn: props.SourceArn,
+      },
+      options
+    );
+  } else if (is<AWS.SQS.Queue>("AWS::SQS::Queue", props)) {
+    return new sqs.Queue(
+      name,
+      {
+        contentBasedDeduplication: props.ContentBasedDeduplication,
+        deduplicationScope: props.DeduplicationScope,
+        delaySeconds: props.DelaySeconds,
+        fifoQueue: props.FifoQueue,
+        fifoThroughputLimit: props.FifoThroughputLimit,
+        kmsDataKeyReusePeriodSeconds: props.KmsDataKeyReusePeriodSeconds,
+        kmsMasterKeyId: props.KmsMasterKeyId,
+        maxMessageSize: props.MaximumMessageSize,
+        messageRetentionSeconds: props.MessageRetentionPeriod,
+        name: props.QueueName,
+        receiveWaitTimeSeconds: props.ReceiveMessageWaitTimeSeconds,
+        redriveAllowPolicy: props.RedriveAllowPolicy,
+        redrivePolicy: props.RedrivePolicy,
+        sqsManagedSseEnabled: props.SqsManagedSseEnabled,
+        visibilityTimeoutSeconds: props.VisibilityTimeout,
+      },
+      options
+    );
+  } else if (
+    is<AWS.Lambda.EventSourceMapping>("AWS::Lambda::EventSourceMapping", props)
+  ) {
+    return new lambda.EventSourceMapping(
+      name,
+      {
+        amazonManagedKafkaEventSourceConfig:
+          props.AmazonManagedKafkaEventSourceConfig
+            ? {
+                consumerGroupId:
+                  props.AmazonManagedKafkaEventSourceConfig.ConsumerGroupId,
+              }
+            : undefined,
+        batchSize: props.BatchSize,
+        bisectBatchOnFunctionError: props.BisectBatchOnFunctionError,
+        destinationConfig: props.DestinationConfig?.OnFailure?.Destination
+          ? {
+              onFailure: {
+                destinationArn: props.DestinationConfig.OnFailure.Destination,
+              },
+            }
+          : undefined,
+        enabled: props.Enabled,
+        eventSourceArn: props.EventSourceArn,
+        filterCriteria: props.FilterCriteria?.Filters
+          ? {
+              filters: props.FilterCriteria.Filters.map((filter) => ({
+                pattern: filter.Pattern,
+              })),
+            }
+          : undefined,
+        functionName: props.FunctionName,
+        functionResponseTypes: props.FunctionResponseTypes,
+        maximumBatchingWindowInSeconds: props.MaximumBatchingWindowInSeconds,
+        maximumRecordAgeInSeconds: props.MaximumRecordAgeInSeconds,
+        maximumRetryAttempts: props.MaximumRetryAttempts,
+        parallelizationFactor: props.ParallelizationFactor,
+        queues: props.Queues,
+        selfManagedEventSource: props.SelfManagedEventSource?.Endpoints
+          ?.KafkaBootstrapServers
+          ? {
+              endpoints: {
+                KAFKA_BOOTSTRAP_SERVERS:
+                  props.SelfManagedEventSource.Endpoints?.KafkaBootstrapServers.join(
+                    ","
+                  ),
+              },
+            }
+          : undefined,
+        selfManagedKafkaEventSourceConfig: props
+          .SelfManagedKafkaEventSourceConfig?.ConsumerGroupId
+          ? {
+              consumerGroupId:
+                props.SelfManagedKafkaEventSourceConfig.ConsumerGroupId,
+            }
+          : undefined,
+        sourceAccessConfigurations: props.SourceAccessConfigurations
+          ? props.SourceAccessConfigurations.flatMap((c) =>
+              c.Type && c.URI
+                ? [
+                    {
+                      type: c.Type,
+                      uri: c.URI,
+                    },
+                  ]
+                : []
+            )
+          : undefined,
+        startingPosition: props.StartingPosition,
+        startingPositionTimestamp: props.StartingPositionTimestamp
+          ? map(props.StartingPositionTimestamp, (ts) =>
+              new Date(ts).toISOString()
+            )
+          : undefined,
+        topics: props.Topics,
+        tumblingWindowInSeconds: props.TumblingWindowInSeconds,
+      },
+      options
+    );
   }
   return undefined;
 
@@ -285,11 +403,15 @@ export function remapCloudControlResource(
 }
 
 function toJson(input: Input<any>): Input<string> {
+  return map(input, JSON.stringify);
+}
+
+function map<T, U>(input: Input<T>, f: (t: T) => U): Input<U> {
   if (isPromise(input)) {
-    return input.then((i) => JSON.stringify(i));
+    return input.then((i) => f(i));
   } else if (Output.isInstance(input)) {
-    return input.apply((i) => JSON.stringify(i));
+    return input.apply((i) => f(i));
   } else {
-    return JSON.stringify(input);
+    return f(input);
   }
 }
