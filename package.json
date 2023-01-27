@@ -6,7 +6,7 @@
   ],
   "module": "./lib/esm/index.js",
   "main": "./lib/cjs/index.js",
-  "types": "./lib/index.d.ts",
+  "types": "./lib/cjs/index.d.ts",
   "scripts": {
     "gen:cfn": "ts-node-esm  ./scripts/gen-cfn-types.ts",
     "build": "tsc -b",
