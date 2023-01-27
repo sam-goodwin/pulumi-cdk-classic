@@ -1,11 +1,12 @@
-import { cloudwatch, iam, lambda } from "@pulumi/aws";
-import { output, ResourceOptions } from "@pulumi/pulumi";
+import { cloudwatch, iam, lambda, scheduler, ssm } from "@pulumi/aws";
+import { Input, Output, output, ResourceOptions } from "@pulumi/pulumi";
 import { CfnElement } from "aws-cdk-lib";
 
 import { ResourceMapping } from "@pulumi/cdk/interop.js";
 import { FromPulumi } from "./bridge.js";
 
 import * as AWS from "./cfn.generated.js";
+import { isPromise } from "util/types";
 
 export function remapCloudControlResource(
   element: CfnElement,
@@ -14,7 +15,7 @@ export function remapCloudControlResource(
   props: any,
   options: ResourceOptions
 ): ResourceMapping | undefined {
-  const name = element.node.path;
+  const name = logicalId;
   // todo
   if (is<AWS.Lambda.Function>("AWS::Lambda::Function", props)) {
     if (props.FileSystemConfigs && props.FileSystemConfigs.length > 1) {
@@ -118,14 +119,14 @@ export function remapCloudControlResource(
 
     return {
       attributes: {
-        Arn: func.arn,
+        arn: func.arn,
         "SnapStartResponse.ApplyOn": func.snapStart?.apply(
           (st) => st?.applyOn!
         ),
         "SnapStartResponse.OptimizationStatus": func.snapStart?.apply(
           (st) => st?.optimizationStatus!
         ),
-      } satisfies FromPulumi<Partial<AWS.Lambda.Function.Attr>>,
+      }, // satisfies FromPulumi<Partial<AWS.Lambda.Function.Attr>>,
       resource: func,
     };
   } else if (is<AWS.IAM.Role>("AWS::IAM::Role", props)) {
@@ -155,9 +156,9 @@ export function remapCloudControlResource(
     return {
       resource: role,
       attributes: {
-        Arn: role.arn,
-        RoleId: role.uniqueId,
-      } satisfies FromPulumi<Partial<AWS.IAM.Role.Attr>>,
+        arn: role.arn,
+        roleId: role.uniqueId,
+      },
     };
   } else if (is<AWS.Events.EventBus>("AWS::Events::EventBus", props)) {
     const bus = new cloudwatch.EventBus(
@@ -174,20 +175,92 @@ export function remapCloudControlResource(
     return {
       resource: bus,
       attributes: {
-        Arn: bus.arn,
-        Name: bus.name,
+        arn: bus.arn,
+        name: bus.name,
         // TODO:
-        Policy: output(
-          Promise.reject(
-            new Error(`Role attribute 'Policy' cannot be polyfilled`)
-          )
-        ),
-      } satisfies FromPulumi<Partial<AWS.Events.EventBus.Attr>>,
+        policy: output(Promise.resolve(JSON.stringify("{}"))),
+      },
     };
+  } else if (
+    is<AWS.Scheduler.ScheduleGroup>("AWS::Scheduler::ScheduleGroup", props)
+  ) {
+    const sg = new scheduler.ScheduleGroup(
+      name,
+      {
+        name: props?.Name,
+        // TODO;
+        // tags: props.Tags,
+      },
+      options
+    );
+
+    return sg;
+  } else if (is<AWS.SSM.Parameter>("AWS::SSM::Parameter", props)) {
+    return new ssm.Parameter(
+      name,
+      {
+        type: props.Type,
+        allowedPattern: props.AllowedPattern,
+        dataType: props.DataType,
+        description: props.Description,
+        // CloudFormation doesn't support SecureString
+        // keyId: props.
+        name: props.Name,
+        value: props.Value,
+      },
+      options
+    );
+  } else if (
+    is<AWS.Lambda.EventInvokeConfig>("AWS::Lambda::EventInvokeConfig", props)
+  ) {
+    return new lambda.FunctionEventInvokeConfig(
+      name,
+      {
+        functionName: props.FunctionName,
+        destinationConfig: props.DestinationConfig
+          ? {
+              onFailure: props.DestinationConfig.OnFailure
+                ? {
+                    destination: props.DestinationConfig.OnFailure.Destination,
+                  }
+                : undefined,
+              onSuccess: props.DestinationConfig.OnSuccess
+                ? {
+                    destination: props.DestinationConfig.OnSuccess.Destination,
+                  }
+                : undefined,
+            }
+          : undefined,
+      },
+      options
+    );
+  } else if (is<AWS.Events.Rule>("AWS::Events::Rule", props)) {
+    return new cloudwatch.EventRule(
+      name,
+      {
+        description: props.Description,
+        eventBusName: props.EventBusName,
+        eventPattern: toJson(props.EventPattern),
+        name: props.Name,
+        roleArn: props.RoleArn,
+        scheduleExpression: props.ScheduleExpression,
+      },
+      options
+    );
   }
   return undefined;
 
   function is<T>(name: string, props: any): props is FromPulumi<T> {
     return typeName === name;
+  }
+}
+
+function toJson(input: Input<any>): Input<string> {
+  if (isPromise(input)) {
+    return input.then((i) => JSON.stringify(i));
+  } else if (Output.isInstance(input)) {
+    return input.apply((i) => JSON.stringify(i));
+  } else {
+    return JSON.stringify(input);
   }
 }
