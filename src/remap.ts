@@ -1,5 +1,12 @@
-import { cloudwatch, iam, lambda, scheduler, ssm } from "@pulumi/aws";
-import { Input, Output, output, ResourceOptions } from "@pulumi/pulumi";
+import fs from "fs";
+import { cloudwatch, iam, lambda, scheduler, sqs, ssm } from "@pulumi/aws";
+import {
+  ComponentResource,
+  Input,
+  Output,
+  output,
+  ResourceOptions,
+} from "@pulumi/pulumi";
 import { CfnElement } from "aws-cdk-lib";
 
 import { ResourceMapping } from "@pulumi/cdk/interop.js";
@@ -247,6 +254,28 @@ export function remapCloudControlResource(
       },
       options
     );
+  } else if (is<AWS.SQS.QueuePolicy>("AWS::SQS::QueuePolicy", props)) {
+    const comp = new ComponentResource(
+      "AWS::SQS::QueuePolicy",
+      name,
+      {},
+      options
+    );
+
+    props.Queues.map(
+      (queueUrl, i) =>
+        new sqs.QueuePolicy(
+          `QueuePolicy${i}`,
+          {
+            policy: toJson(props.PolicyDocument),
+            queueUrl,
+          },
+          {
+            parent: comp,
+          }
+        )
+    );
+    return comp;
   }
   return undefined;
 
