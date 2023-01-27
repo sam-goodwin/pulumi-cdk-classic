@@ -8,6 +8,7 @@ import { CfnFunction } from "aws-cdk-lib/aws-lambda";
 import { RemoteAsset } from "@pulumi/pulumi/asset";
 import { ResourceMapping } from "@pulumi/cdk/interop.js";
 import cfn from "@aws-cdk/cfnspec";
+import { Lambda } from "./cfn.generated.js";
 
 export function remapCloudControlResource(
   element: CfnElement,
@@ -18,6 +19,7 @@ export function remapCloudControlResource(
 ): ResourceMapping | undefined {
   // todo
   if (element instanceof CfnFunction) {
+    const functionProps: Lambda.Function = props;
     console.log(props);
     return new lambda.Function(
       element.node.path,

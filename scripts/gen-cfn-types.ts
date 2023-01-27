@@ -1,9 +1,11 @@
 import path from "path";
 import fs from "fs/promises";
-import ts, { SelectionRange } from "typescript";
+import ts from "typescript";
 import cfn from "@aws-cdk/cfnspec";
 import prettier from "prettier";
 import * as url from "url";
+import { isPrimitiveProperty } from "@aws-cdk/cfnspec/lib/schema/property.js";
+
 const __dirname = url.fileURLToPath(new URL(".", import.meta.url));
 
 const namespaces = cfn.namespaces();
@@ -17,16 +19,21 @@ type CfnType<T extends cfn.schema.ResourceType | cfn.schema.PropertyType> = [
 ];
 
 for (const namespace of namespaces) {
-  const resources = filterByPrefix(specification.ResourceTypes, namespace);
-  const properties = filterByPrefix(specification.PropertyTypes, namespace);
+  const resources = filterByPrefix(
+    specification.ResourceTypes,
+    `${namespace}::`
+  );
+  const properties = filterByPrefix(
+    specification.PropertyTypes,
+    `${namespace}::`
+  );
 
   const [, service] = namespace.split("::");
-  console.log(namespace, service);
 
   statements.push(
     createNamespace(service, [
       ...resourcesToInterfaces(resources),
-      ...propertiesToInterfaces(properties),
+      ...propertiesToInterfaces(service, resources, properties),
     ])
   );
 }
@@ -63,33 +70,45 @@ function resourcesToInterfaces(resources: CfnType<cfn.schema.ResourceType>[]) {
 }
 
 function propertiesToInterfaces(
+  serviceName: string,
+  resources: CfnType<cfn.schema.ResourceType>[],
   properties: CfnType<cfn.schema.PropertyType>[]
 ): ts.Statement[] {
-  const declarations: (ts.ModuleDeclaration | ts.InterfaceDeclaration)[] = [];
-
   const nestedTypes = properties
     .filter(([name]) => name.includes("."))
     .reduce<Record<string, Record<string, cfn.schema.PropertyType>>>(
-      (obj, [name, val]) => ({
-        ...obj,
-        [name]: obj[name] ? { ...obj[name], [name]: val } : { [name]: val },
-      }),
+      (resources, [fqn, propertyType]) => {
+        const [, , resourceAndProperty] = fqn.split("::");
+        const [resourceName, propertyName] = resourceAndProperty.split(".");
+
+        resources[resourceName] ??= {};
+        resources[resourceName][propertyName] = propertyType;
+
+        return resources;
+      },
       {}
     );
-  const rootTypes = properties.filter(([name]) => !name.includes("."));
+  const rootTypes = [
+    ...resources,
+    ...properties.filter(([name]) => !name.includes(".")),
+  ];
 
   return [
     ...rootTypes.flatMap(([fqn, type]) => {
       let [, , typeName] = fqn.split("::");
 
+      const fieldTypes = nestedTypes[typeName];
       return [
         typeToInterface(typeName, type),
-        createNamespace(typeName, [
-          typeToInterface(typeName, type),
-          ...Object.entries(nestedTypes[typeName] ?? {}).map(
-            ([propertyName, type]) => typeToInterface(propertyName, type)
-          ),
-        ]),
+        ...(fieldTypes
+          ? [
+              createNamespace(typeName, [
+                ...Object.entries(fieldTypes ?? {}).map(
+                  ([propertyName, type]) => typeToInterface(propertyName, type)
+                ),
+              ]),
+            ]
+          : []),
       ];
     }),
   ];
@@ -99,12 +118,48 @@ function typeToInterface(
   name: string,
   type: cfn.schema.ResourceType | cfn.schema.PropertyType
 ): ts.InterfaceDeclaration {
+  let properties: ts.PropertySignature[] | undefined = undefined;
+  if ("Properties" in type) {
+    properties = Object.entries(type.Properties ?? {}).flatMap(
+      ([name, type]) => {
+        if (isPrimitiveProperty(type)) {
+          return ts.factory.createPropertySignature(
+            undefined,
+            ts.factory.createIdentifier(name),
+            !type.Required
+              ? ts.factory.createToken(ts.SyntaxKind.QuestionToken)
+              : undefined,
+            isPrimitiveProperty(type)
+              ? ts.factory.createKeywordTypeNode(
+                  type.PrimitiveType === cfn.schema.PrimitiveType.Boolean
+                    ? ts.SyntaxKind.BooleanKeyword
+                    : type.PrimitiveType === cfn.schema.PrimitiveType.Double
+                    ? ts.SyntaxKind.NumberKeyword
+                    : type.PrimitiveType === cfn.schema.PrimitiveType.Integer
+                    ? ts.SyntaxKind.NumberKeyword
+                    : type.PrimitiveType === cfn.schema.PrimitiveType.Json
+                    ? ts.SyntaxKind.AnyKeyword
+                    : type.PrimitiveType === cfn.schema.PrimitiveType.Long
+                    ? ts.SyntaxKind.NumberKeyword
+                    : type.PrimitiveType === cfn.schema.PrimitiveType.String
+                    ? ts.SyntaxKind.StringKeyword
+                    : type.PrimitiveType === cfn.schema.PrimitiveType.Timestamp
+                    ? ts.SyntaxKind.StringKeyword
+                    : 1
+                )
+              : ts.factory.createTypeReferenceNode(type)
+          );
+        }
+        return [];
+      }
+    );
+  }
   return ts.factory.createInterfaceDeclaration(
-    undefined,
+    [ts.factory.createToken(ts.SyntaxKind.ExportKeyword)],
     name,
     undefined,
     undefined,
-    []
+    [...(properties ?? [])]
   );
 }
 
